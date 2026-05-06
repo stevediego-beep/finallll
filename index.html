@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CalculatingIrregular Pro | Simpson's Rule Visualizer</title>
+    <title>CalculatingIrregular Pro | Function Visualizer</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
     <style>
         :root { --primary: #0078d4; --bg: #f4f4f4; --card: #ffffff; }
         body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -13,6 +14,7 @@
         .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
         label { display: block; font-weight: 600; font-size: 13px; color: #555; margin-bottom: 5px; }
         input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        .full-width { grid-column: span 2; }
         button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         button:hover { background: #005a9e; }
         #plot { width: 100%; height: 500px; margin-top: 20px; border-radius: 8px; overflow: hidden; }
@@ -22,24 +24,28 @@
 <body>
 
 <div class="card">
-    <h1>CalculatingIrregular: Simpson's Rule & 3D Visualization</h1>
+    <h1>CalculatingIrregular: Function-Based 3D Visualizer</h1>
     
     <div class="input-grid">
-        <div>
-            <label>Outer Radii ($R$):</label>
-            <input type="text" id="outerR" value="5, 8, 10, 8, 5" placeholder="e.g. 5, 8, 10">
+        <div class="full-width">
+            <label>Outer Function R(x):</label>
+            <input type="text" id="funcR" value="sqrt(x)" placeholder="e.g. x^2, sin(x), sqrt(x)">
+        </div>
+        <div class="full-width">
+            <label>Inner Function r(x) (Optional):</label>
+            <input type="text" id="funcInner" value="0" placeholder="e.g. 0.5 * x">
         </div>
         <div>
-            <label>Inner Radii ($r$):</label>
-            <input type="text" id="innerR" value="0, 0, 0, 0, 0" placeholder="0 for solid">
+            <label>Interval [a, b]:</label>
+            <input type="text" id="interval" value="0, 4" placeholder="start, end">
         </div>
         <div>
-            <label>Interval [$a, b$]:</label>
-            <input type="text" id="interval" value="0, 10" placeholder="start, end">
-        </div>
-        <div>
-            <label>Rotation Angle ($\theta^\circ$):</label>
+            <label>Rotation Angle (θ°):</label>
             <input type="number" id="theta" value="360" max="360" min="1">
+        </div>
+        <div>
+            <label>Samples (must be odd for Simpson's):</label>
+            <input type="number" id="samples" value="21" step="2" min="3">
         </div>
     </div>
 
@@ -51,77 +57,80 @@
 
 <script>
     function calculateAndPlot() {
-        // 1. Data Parsing
-        const outer = document.getElementById('outerR').value.split(',').map(Number);
-        const inner = document.getElementById('innerR').value.split(',').map(Number);
+        const funcStr = document.getElementById('funcR').value;
+        const innerStr = document.getElementById('funcInner').value;
         const [a, b] = document.getElementById('interval').value.split(',').map(Number);
         const thetaDeg = parseFloat(document.getElementById('theta').value);
-        
-        if (outer.length % 2 === 0) {
-            alert("Simpson's Rule requires an odd number of data points (even number of intervals).");
+        const nPoints = parseInt(document.getElementById('samples').value);
+
+        if (nPoints % 2 === 0) {
+            alert("Simpson's Rule requires an odd number of data points.");
             return;
         }
 
-        const n = outer.length - 1;
-        const h = (b - a) / n;
-        const thetaRad = (thetaDeg * Math.PI) / 180;
+        try {
+            const h = (b - a) / (nPoints - 1);
+            const thetaRad = (thetaDeg * Math.PI) / 180;
+            const compiledR = math.compile(funcStr);
+            const compiledInner = math.compile(innerStr);
 
-        // 2. Simpson's Rule Integration
-        // Volume = (theta / 2) * Integral[R(x)^2 - r(x)^2] dx
-        let sum = 0;
-        const f = (i) => Math.pow(outer[i], 2) - Math.pow(inner[i], 2);
+            let xRange = [];
+            let outerRadii = [];
+            let innerRadii = [];
 
-        for (let i = 0; i <= n; i++) {
-            let weight = (i === 0 || i === n) ? 1 : (i % 2 === 1 ? 4 : 2);
-            sum += weight * f(i);
-        }
-        const volume = (thetaRad / 2) * (h / 3) * sum;
-
-        // 3. Display Result
-        const badge = document.getElementById('result-badge');
-        badge.style.display = 'block';
-        badge.innerHTML = `Estimated Volume: ${volume.toFixed(4)} units³`;
-
-        // 4. Plotly 3D Visualization
-        const xRange = Array.from({length: outer.length}, (_, i) => a + i * h);
-        const thetaSteps = 40;
-        const phiRange = Array.from({length: thetaSteps}, (_, i) => (i / (thetaSteps - 1)) * thetaRad);
-
-        let data = [];
-
-        // Generate Outer Surface
-        let xArr = [], yArr = [], zArr = [];
-        for (let i = 0; i < xRange.length; i++) {
-            let rowX = [], rowY = [], rowZ = [];
-            for (let j = 0; j < phiRange.length; j++) {
-                rowX.push(xRange[i]);
-                rowY.push(outer[i] * Math.cos(phiRange[j]));
-                rowZ.push(outer[i] * Math.sin(phiRange[j]));
+            // 1. Generate points from functions
+            for (let i = 0; i < nPoints; i++) {
+                let x = a + i * h;
+                xRange.push(x);
+                outerRadii.push(compiledR.evaluate({x: x}));
+                innerRadii.push(compiledInner.evaluate({x: x}));
             }
-            xArr.push(rowX); yArr.push(rowY); zArr.push(rowZ);
+
+            // 2. Simpson's Rule Integration
+            let sum = 0;
+            for (let i = 0; i < nPoints; i++) {
+                let weight = (i === 0 || i === nPoints - 1) ? 1 : (i % 2 === 1 ? 4 : 2);
+                let val = Math.pow(outerRadii[i], 2) - Math.pow(innerRadii[i], 2);
+                sum += weight * val;
+            }
+            const volume = (thetaRad / 2) * (h / 3) * sum;
+
+            // 3. Display Result
+            const badge = document.getElementById('result-badge');
+            badge.style.display = 'block';
+            badge.innerHTML = `Calculated Volume: ${volume.toFixed(4)} units³`;
+
+            // 4. Plotly 3D Generation
+            const thetaSteps = 50;
+            const phiRange = Array.from({length: thetaSteps}, (_, i) => (i / (thetaSteps - 1)) * thetaRad);
+
+            function createSurface(radii, color) {
+                let xS = [], yS = [], zS = [];
+                for (let i = 0; i < xRange.length; i++) {
+                    let rX = [], rY = [], rZ = [];
+                    for (let j = 0; j < phiRange.length; j++) {
+                        rX.push(xRange[i]);
+                        rY.push(radii[i] * Math.cos(phiRange[j]));
+                        rZ.push(radii[i] * Math.sin(phiRange[j]));
+                    }
+                    xS.push(rX); yS.push(rY); zS.push(rZ);
+                }
+                return { type: 'surface', x: xS, y: yS, z: zS, colorscale: color, showscale: false, opacity: 0.7 };
+            }
+
+            let data = [createSurface(outerRadii, 'Blues')];
+            if (innerRadii.some(r => r > 0)) {
+                data.push(createSurface(innerRadii, 'Reds'));
+            }
+
+            Plotly.newPlot('plot', data, {
+                scene: { xaxis: {title: 'X'}, yaxis: {title: 'Y'}, zaxis: {title: 'Z'} },
+                margin: {l:0, r:0, b:0, t:40}
+            });
+
+        } catch (err) {
+            alert("Error in function expression. Please check your math syntax.");
         }
-
-        data.push({
-            type: 'surface',
-            x: xArr, y: yArr, z: zArr,
-            colorscale: 'Blues',
-            showscale: false,
-            opacity: 0.8,
-            name: 'Outer Surface'
-        });
-
-        // Layout
-        const layout = {
-            title: '3D Solid of Revolution',
-            scene: {
-                xaxis: {title: 'X (Axis of Rotation)'},
-                yaxis: {title: 'Y'},
-                zaxis: {title: 'Z'}
-            },
-            margin: {l:0, r:0, b:0, t:40}
-        };
-
-        Plotly.newPlot('plot', data, layout);
     }
 </script>
 
