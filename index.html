@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalculatingIrregular | Volume Visualizer</title>
+    <style>
+        :root { --primary: #0078d4; --bg: #f3f2f1; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 40px; }
+        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 500px; }
+        h1 { color: var(--primary); margin-top: 0; font-size: 24px; }
+        label { display: block; margin-top: 15px; font-weight: 600; color: #444; }
+        input { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; margin-top: 20px; border-radius: 4px; cursor: pointer; font-size: 16px; transition: 0.2s; }
+        button:hover { background: #005a9e; }
+        #result-box { margin-top: 20px; padding: 15px; border-radius: 4px; display: none; }
+        .success { background: #dff6dd; color: #107c10; border: 1px solid #107c10; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>Volume Visualizer</h1>
+    <p style="color: #666; font-size: 14px;">Engineering Tool: Irregular Solid Volume (Disk Method)</p>
+    <hr>
+
+    <label for="radii">Radii (comma separated):</label>
+    <input type="text" id="radii" placeholder="e.g., 5, 10, 8, 5" value="5, 10, 5">
+
+    <label for="dx">Distance between points (dx):</label>
+    <input type="number" id="dx" value="1" step="0.1">
+
+    <button onclick="calculateVolume()">Calculate Volume</button>
+
+    <div id="result-box">
+        <strong>Total Volume:</strong> <span id="volume-result">0</span> units³
+    </div>
+</div>
+
+<script>
+    function calculateVolume() {
+        // 1. Get Values
+        const radiiInput = document.getElementById('radii').value;
+        const dx = parseFloat(document.getElementById('dx').value);
+        const resultBox = document.getElementById('result-box');
+        const volumeSpan = document.getElementById('volume-result');
+
+        // 2. Process Input (Same logic as your VB list)
+        const radii = radiiInput.split(',').map(item => parseFloat(item.trim()));
+
+        // Validation
+        if (radii.some(isNaN) || isNaN(dx) || radii.length < 2) {
+            alert("Please enter valid numbers and at least two radii.");
+            return;
+        }
+
+        // 3. The Math Logic (Translated from your VB CalculateDiskMethod)
+        let totalVolume = 0;
+        for (let i = 0; i < radii.length - 1; i++) {
+            // Average radius between two points (Trapezoidal/Disk approach)
+            let rAvg = (radii[i] + radii[i + 1]) / 2;
+            // π * r² * dx
+            totalVolume += Math.PI * Math.pow(rAvg, 2) * dx;
+        }
+
+        // 4. Display Result
+        volumeSpan.innerText = totalVolume.toLocaleString(undefined, {minimumFractionDigits: 4});
+        resultBox.className = "success";
+        resultBox.style.display = "block";
+    }
+</script>
+
+</body>
+</html>
