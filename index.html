@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CalculatingIrregular Pro | Function Visualizer</title>
+    <title>CalculatingIrregular Pro | Ratio & Irregular Scaling</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
     <style>
@@ -24,32 +24,32 @@
 <body>
 
 <div class="card">
-    <h1>CalculatingIrregular: Function-Based 3D Visualizer</h1>
+    <h1>CalculatingIrregular: Ratio & Irregular Scaling</h1>
     
     <div class="input-grid">
         <div class="full-width">
-            <label>Outer Function R(x):</label>
-            <input type="text" id="funcR" value="sqrt(x)" placeholder="e.g. x^2, sin(x), sqrt(x)">
-        </div>
-        <div class="full-width">
-            <label>Inner Function r(x) (Optional):</label>
-            <input type="text" id="funcInner" value="0" placeholder="e.g. 0.5 * x">
+            <label>Function R(x) (Calculates Irregular Profiles):</label>
+            <input type="text" id="funcR" value="sqrt(x)" placeholder="e.g. x^2, sin(x)">
         </div>
         <div>
             <label>Interval [a, b]:</label>
-            <input type="text" id="interval" value="0, 4" placeholder="start, end">
+            <input type="text" id="interval" value="0, 4">
+        </div>
+        <div>
+            <label>Scale Ratio (e.g., 1.5):</label>
+            <input type="number" id="ratio" value="1.0" step="0.1">
         </div>
         <div>
             <label>Rotation Angle (θ°):</label>
-            <input type="number" id="theta" value="360" max="360" min="1">
+            <input type="number" id="theta" value="360" max="360">
         </div>
         <div>
-            <label>Samples (must be odd for Simpson's):</label>
-            <input type="number" id="samples" value="21" step="2" min="3">
+            <label>Samples (Odd Number):</label>
+            <input type="number" id="samples" value="21" step="2">
         </div>
     </div>
 
-    <button onclick="calculateAndPlot()">Calculate & Generate 3D Model</button>
+    <button onclick="calculateAndPlot()">Calculate Scaled Volume</button>
 
     <div id="result-badge" class="result-badge"></div>
     <div id="plot"></div>
@@ -58,81 +58,60 @@
 <script>
     function calculateAndPlot() {
         const funcStr = document.getElementById('funcR').value;
-        const innerStr = document.getElementById('funcInner').value;
         const [a, b] = document.getElementById('interval').value.split(',').map(Number);
+        const ratio = parseFloat(document.getElementById('ratio').value);
         const thetaDeg = parseFloat(document.getElementById('theta').value);
         const nPoints = parseInt(document.getElementById('samples').value);
-
-        if (nPoints % 2 === 0) {
-            alert("Simpson's Rule requires an odd number of data points.");
-            return;
-        }
 
         try {
             const h = (b - a) / (nPoints - 1);
             const thetaRad = (thetaDeg * Math.PI) / 180;
             const compiledR = math.compile(funcStr);
-            const compiledInner = math.compile(innerStr);
 
-            let xRange = [];
-            let outerRadii = [];
-            let innerRadii = [];
+            let xRange = [], outerRadii = [];
 
-            // 1. Generate points from functions
             for (let i = 0; i < nPoints; i++) {
                 let x = a + i * h;
                 xRange.push(x);
-                outerRadii.push(compiledR.evaluate({x: x}));
-                innerRadii.push(compiledInner.evaluate({x: x}));
+                // Apply the Ratio to the radii for irregular scaling
+                outerRadii.push(compiledR.evaluate({x: x}) * ratio);
             }
 
-            // 2. Simpson's Rule Integration
+            // Simpson's Rule
             let sum = 0;
             for (let i = 0; i < nPoints; i++) {
                 let weight = (i === 0 || i === nPoints - 1) ? 1 : (i % 2 === 1 ? 4 : 2);
-                let val = Math.pow(outerRadii[i], 2) - Math.pow(innerRadii[i], 2);
-                sum += weight * val;
+                sum += weight * Math.pow(outerRadii[i], 2);
             }
             const volume = (thetaRad / 2) * (h / 3) * sum;
 
-            // 3. Display Result
             const badge = document.getElementById('result-badge');
             badge.style.display = 'block';
-            badge.innerHTML = `Calculated Volume: ${volume.toFixed(4)} units³`;
+            badge.innerHTML = `Scaled Volume: ${volume.toFixed(4)} units³`;
 
-            // 4. Plotly 3D Generation
+            // 3D Visualization
             const thetaSteps = 50;
             const phiRange = Array.from({length: thetaSteps}, (_, i) => (i / (thetaSteps - 1)) * thetaRad);
-
-            function createSurface(radii, color) {
-                let xS = [], yS = [], zS = [];
-                for (let i = 0; i < xRange.length; i++) {
-                    let rX = [], rY = [], rZ = [];
-                    for (let j = 0; j < phiRange.length; j++) {
-                        rX.push(xRange[i]);
-                        rY.push(radii[i] * Math.cos(phiRange[j]));
-                        rZ.push(radii[i] * Math.sin(phiRange[j]));
-                    }
-                    xS.push(rX); yS.push(rY); zS.push(rZ);
+            let xS = [], yS = [], zS = [];
+            for (let i = 0; i < xRange.length; i++) {
+                let rX = [], rY = [], rZ = [];
+                for (let j = 0; j < phiRange.length; j++) {
+                    rX.push(xRange[i]);
+                    rY.push(outerRadii[i] * Math.cos(phiRange[j]));
+                    rZ.push(outerRadii[i] * Math.sin(phiRange[j]));
                 }
-                return { type: 'surface', x: xS, y: yS, z: zS, colorscale: color, showscale: false, opacity: 0.7 };
+                xS.push(rX); yS.push(rY); zS.push(rZ);
             }
 
-            let data = [createSurface(outerRadii, 'Blues')];
-            if (innerRadii.some(r => r > 0)) {
-                data.push(createSurface(innerRadii, 'Reds'));
-            }
-
-            Plotly.newPlot('plot', data, {
+            Plotly.newPlot('plot', [{ type: 'surface', x: xS, y: yS, z: zS, colorscale: 'Viridis', showscale: false }], {
                 scene: { xaxis: {title: 'X'}, yaxis: {title: 'Y'}, zaxis: {title: 'Z'} },
                 margin: {l:0, r:0, b:0, t:40}
             });
 
         } catch (err) {
-            alert("Error in function expression. Please check your math syntax.");
+            alert("Check your math syntax or interval.");
         }
     }
 </script>
-
 </body>
 </html>
