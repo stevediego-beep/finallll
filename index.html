@@ -3,87 +3,125 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CalculatingIrregular | Advanced Volume Visualizer</title>
+    <title>CalculatingIrregular Pro | Simpson's Rule Visualizer</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
-        :root { --primary: #0078d4; --bg: #f3f2f1; }
-        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); display: flex; justify-content: center; padding: 20px; }
-        .card { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
-        h1 { color: var(--primary); margin: 0 0 10px 0; font-size: 22px; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-        label { display: block; font-weight: 600; color: #444; margin-bottom: 5px; font-size: 14px; }
-        input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
-        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; margin-top: 25px; border-radius: 4px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        :root { --primary: #0078d4; --bg: #f4f4f4; --card: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+        .card { background: var(--card); border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.1); padding: 25px; width: 100%; max-width: 900px; margin-bottom: 20px; }
+        h1 { color: var(--primary); margin: 0 0 15px 0; font-size: 22px; border-bottom: 2px solid var(--bg); padding-bottom: 10px; }
+        .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        label { display: block; font-weight: 600; font-size: 13px; color: #555; margin-bottom: 5px; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         button:hover { background: #005a9e; }
-        #result-box { margin-top: 20px; padding: 20px; border-radius: 4px; display: none; text-align: center; }
-        .success { background: #dff6dd; color: #107c10; border: 1px solid #107c10; }
-        .info-text { color: #666; font-size: 13px; margin-bottom: 20px; }
+        #plot { width: 100%; height: 500px; margin-top: 20px; border-radius: 8px; overflow: hidden; }
+        .result-badge { background: #e1f5fe; color: #01579b; padding: 15px; border-radius: 8px; text-align: center; margin-top: 20px; font-size: 18px; font-weight: bold; display: none; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h1>Advanced Volume Visualizer</h1>
-    <p class="info-text">Calculating volume using the Washer Method (Inner & Outer Radii) over a specified interval.</p>
-    <hr>
-
-    <div class="grid">
+    <h1>CalculatingIrregular: Simpson's Rule & 3D Visualization</h1>
+    
+    <div class="input-grid">
         <div>
-            <label>Start Point (a):</label>
-            <input type="number" id="startPt" value="0">
+            <label>Outer Radii ($R$):</label>
+            <input type="text" id="outerR" value="5, 8, 10, 8, 5" placeholder="e.g. 5, 8, 10">
         </div>
         <div>
-            <label>End Point (b):</label>
-            <input type="number" id="endPt" value="10">
+            <label>Inner Radii ($r$):</label>
+            <input type="text" id="innerR" value="0, 0, 0, 0, 0" placeholder="0 for solid">
+        </div>
+        <div>
+            <label>Interval [$a, b$]:</label>
+            <input type="text" id="interval" value="0, 10" placeholder="start, end">
+        </div>
+        <div>
+            <label>Rotation Angle ($\theta^\circ$):</label>
+            <input type="number" id="theta" value="360" max="360" min="1">
         </div>
     </div>
 
-    <label style="margin-top: 15px;">Outer Radii (comma separated):</label>
-    <input type="text" id="outerRadii" placeholder="e.g., 10, 15, 12, 10" value="10, 15, 10">
+    <button onclick="calculateAndPlot()">Calculate & Generate 3D Model</button>
 
-    <label style="margin-top: 15px;">Inner Radii (comma separated):</label>
-    <input type="text" id="innerRadii" placeholder="e.g., 2, 4, 2" value="2, 4, 2">
-
-    <button onclick="calculateAdvancedVolume()">Calculate Total Volume</button>
-
-    <div id="result-box">
-        <div style="font-size: 14px;">Estimated Volume</div>
-        <div style="font-size: 24px; font-weight: bold;"><span id="volume-result">0</span> units³</div>
-    </div>
+    <div id="result-badge" class="result-badge"></div>
+    <div id="plot"></div>
 </div>
 
 <script>
-    function calculateAdvancedVolume() {
-        const a = parseFloat(document.getElementById('startPt').value);
-        const b = parseFloat(document.getElementById('endPt').value);
-        const outerStr = document.getElementById('outerRadii').value;
-        const innerStr = document.getElementById('innerRadii').value;
+    function calculateAndPlot() {
+        // 1. Data Parsing
+        const outer = document.getElementById('outerR').value.split(',').map(Number);
+        const inner = document.getElementById('innerR').value.split(',').map(Number);
+        const [a, b] = document.getElementById('interval').value.split(',').map(Number);
+        const thetaDeg = parseFloat(document.getElementById('theta').value);
         
-        const outerArr = outerStr.split(',').map(n => parseFloat(n.trim()));
-        const innerArr = innerStr.split(',').map(n => parseFloat(n.trim()));
-
-        if (outerArr.length !== innerArr.length || outerArr.length < 2) {
-            alert("Error: The number of Outer and Inner radii must match.");
+        if (outer.length % 2 === 0) {
+            alert("Simpson's Rule requires an odd number of data points (even number of intervals).");
             return;
         }
 
-        const n = outerArr.length - 1;
-        const dx = (b - a) / n;
-        let totalVolume = 0;
+        const n = outer.length - 1;
+        const h = (b - a) / n;
+        const thetaRad = (thetaDeg * Math.PI) / 180;
 
-        for (let i = 0; i < n; i++) {
-            // Average radii for the segment (Disk/Washer Method)
-            let R_avg = (outerArr[i] + outerArr[i+1]) / 2;
-            let r_avg = (innerArr[i] + innerArr[i+1]) / 2;
+        // 2. Simpson's Rule Integration
+        // Volume = (theta / 2) * Integral[R(x)^2 - r(x)^2] dx
+        let sum = 0;
+        const f = (i) => Math.pow(outer[i], 2) - Math.pow(inner[i], 2);
 
-            // Volume = π * (R² - r²) * dx
-            let segmentVolume = Math.PI * (Math.pow(R_avg, 2) - Math.pow(r_avg, 2)) * dx;
-            totalVolume += segmentVolume;
+        for (let i = 0; i <= n; i++) {
+            let weight = (i === 0 || i === n) ? 1 : (i % 2 === 1 ? 4 : 2);
+            sum += weight * f(i);
+        }
+        const volume = (thetaRad / 2) * (h / 3) * sum;
+
+        // 3. Display Result
+        const badge = document.getElementById('result-badge');
+        badge.style.display = 'block';
+        badge.innerHTML = `Estimated Volume: ${volume.toFixed(4)} units³`;
+
+        // 4. Plotly 3D Visualization
+        const xRange = Array.from({length: outer.length}, (_, i) => a + i * h);
+        const thetaSteps = 40;
+        const phiRange = Array.from({length: thetaSteps}, (_, i) => (i / (thetaSteps - 1)) * thetaRad);
+
+        let data = [];
+
+        // Generate Outer Surface
+        let xArr = [], yArr = [], zArr = [];
+        for (let i = 0; i < xRange.length; i++) {
+            let rowX = [], rowY = [], rowZ = [];
+            for (let j = 0; j < phiRange.length; j++) {
+                rowX.push(xRange[i]);
+                rowY.push(outer[i] * Math.cos(phiRange[j]));
+                rowZ.push(outer[i] * Math.sin(phiRange[j]));
+            }
+            xArr.push(rowX); yArr.push(rowY); zArr.push(rowZ);
         }
 
-        const resBox = document.getElementById('result-box');
-        document.getElementById('volume-result').innerText = totalVolume.toLocaleString(undefined, {minimumFractionDigits: 4});
-        resBox.className = "success";
-        resBox.style.display = "block";
+        data.push({
+            type: 'surface',
+            x: xArr, y: yArr, z: zArr,
+            colorscale: 'Blues',
+            showscale: false,
+            opacity: 0.8,
+            name: 'Outer Surface'
+        });
+
+        // Layout
+        const layout = {
+            title: '3D Solid of Revolution',
+            scene: {
+                xaxis: {title: 'X (Axis of Rotation)'},
+                yaxis: {title: 'Y'},
+                zaxis: {title: 'Z'}
+            },
+            margin: {l:0, r:0, b:0, t:40}
+        };
+
+        Plotly.newPlot('plot', data, layout);
     }
 </script>
 
